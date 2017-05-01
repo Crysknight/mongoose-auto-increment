@@ -116,6 +116,25 @@ exports.plugin = function (schema, options) {
   schema.method('resetCount', resetCount);
   schema.static('resetCount', resetCount);
 
+  // Declare a function to decrement the counter in case of an error with saving the new document
+  var decrementCount = function (callback) {
+    IdentityCounter.find({ model: settings.model, field: settings.field }, function (err, counter) {
+      IdentityCounter.findOneAndUpdate(
+        { model: settings.model, field: settings.field },
+        { count: counter.count - settings.incrementBy },
+        { new: true },
+        function (err) {
+          if (err) return callback(err);
+          callback(null, counter.count - settings.incrementBy );
+        }
+      );
+    });
+  };
+  // I guess the main reason to use it is in the if (err) section of document saving callback. So if there's an error
+  // the auto-incrementing id field won't increment.
+  schema.method('decrementCount', decrementCount);
+  schema.static('decrementCount', decrementCount);
+
   // Every time documents in this schema are saved, run this logic.
   schema.pre('save', function (next) {
     // Get reference to the document being saved.
